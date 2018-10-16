@@ -1,24 +1,14 @@
 import os
 
-from .base import cast, dict_obj
+from .base import cast
 from .caster import str_caster
 
 
-class LoadEnviron(type):
-    """Metaclass to load env vars on config import."""
+class EnvironConfig:
+    """Loads and casts named values from environ and stores them in instance."""
 
-    def __new__(cls, name, bases, dct):
-        schema = super().__new__(cls, name, bases, dct)
-        if not bases:
-            return schema
-        return cast(os.environ, schema)
-
-
-class EnvironConfig(metaclass=LoadEnviron):
-    """Base schema class to create env configs."""
-
-    __settings__ = {
-        'precasters': [str_caster],
-        'on_extra': 'ignore',
-        'result_class': dict_obj
-    }
+    def __init__(self):
+        result = cast(os.environ, self.__class__,
+                      on_extra='ignore', precasters=[str_caster])
+        for k, v in result.items():
+            setattr(self, k, v)

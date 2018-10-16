@@ -9,11 +9,6 @@ from datacast.env import EnvironConfig
 from datacast.errors import *
 
 
-os.environ['SPAM'] = '1'
-os.environ['HAM'] = 't'
-os.environ['RABBIT'] = 'null'
-
-
 class SimpleEnum(Enum):
     ONE = 1
     TWO = 2
@@ -37,29 +32,37 @@ def test_cast():
 
 
 @pytest.fixture
-def simple_env_conf():
-    def wrapper():
-        class SimpleEnvConfig(EnvironConfig):
-            SPAM: int
-            HAM: bool = False
-            RABBIT: None = None
-            KNIGHT: str = 'TestString'
-        return SimpleEnvConfig
-    return wrapper
+def env_setup():
+    fake_env = dict(SPAM='1', HAM='t', RABBIT='null')
+    for k, v in fake_env.items():
+        os.environ[k] = v
+    yield
+    for k in fake_env:
+        if k in os.environ:
+            del os.environ[k]
 
 
-def test_env(simple_env_conf):
-    conf = simple_env_conf()
+class SimpleEnvConfig(EnvironConfig):
+    SPAM: int
+    HAM: bool = False
+    RABBIT: None = None
+    KNIGHT: str = 'TestString'
+
+
+def test_env(env_setup):
+    conf = SimpleEnvConfig()
     assert conf.SPAM == 1
     assert conf.HAM is True
     assert conf.RABBIT is None
     assert conf.KNIGHT == 'TestString'
 
 
-def test_env_fail(simple_env_conf):
+def test_env_fail(env_setup):
     del os.environ['SPAM']
     with pytest.raises(RequiredFieldError):
-        simple_env_conf()
+        SimpleEnvConfig()
+    os.environ['SPAM'] = '2'
+    assert SimpleEnvConfig().SPAM == 2
 
 
 @apply_settings(

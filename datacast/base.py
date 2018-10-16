@@ -266,13 +266,6 @@ class value_factory:
         return self.factory()
 
 
-class dict_obj(UserDict):
-    """Dict-like object with __getattr__ access."""
-
-    def __getattr__(self, name):
-        return self.data[name]
-
-
 def apply_settings(settings: Union[Settings, dict] = None, **options):
     """Decorate class or method to apply settings."""
     def wrapper(schema):
