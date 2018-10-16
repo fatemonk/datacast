@@ -11,7 +11,7 @@ with io.open(os.path.join(here, 'README.rst'), encoding='utf-8') as fp:
 
 
 setup(
-    name='datcast',
+    name='datacast',
     version=__version__,
     description='Simple way to cast your data.',
     long_description=README,
