@@ -30,7 +30,7 @@ Define schema (can be any class with annotations) and use ``cast`` function.
         four: None = 'four'
 
 
-    result = cast({'zero': 0, 'one': 1, 'two': 2, 'four': 5}, SimpleSchema)
+    cast({'zero': 0, 'one': 1, 'two': 2, 'four': 5}, SimpleSchema)
     # {'zero': False, 'one': 1, 'two': '2', 'three': 0.3, four': 5}
 
 Rules are simple:
