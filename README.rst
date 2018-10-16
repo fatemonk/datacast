@@ -46,6 +46,7 @@ Settings
 To be added.
 
 .. |pypi| image:: https://img.shields.io/badge/version-0.1.0-orange.svg?style=flat-square
+    :target: https://pypi.org/project/datacast/0.1.0/
     :alt: Latest version released on PyPI
 
 .. |python_version| image:: https://img.shields.io/badge/python-%3E%3D3.3-blue.svg?style=flat-square
