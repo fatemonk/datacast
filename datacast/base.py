@@ -4,7 +4,7 @@ from enum import Enum
 from inspect import (_empty, isclass, isdatadescriptor,
                      ismethod, isroutine, signature)
 from itertools import chain
-from typing import Union, Type
+from typing import Callable, Union, Type
 
 from .errors import *
 
@@ -194,13 +194,14 @@ class Schema:
         yield from self.fields.values()
 
     def exclude(self, keys):
+        """Exclude fields from process."""
         self.fields = {k: v for k, v in self.fields.items() if k not in keys}
 
 
 class Field:
     """Field with name, caster and default value if provided."""
 
-    def __init__(self, name, caster, default):
+    def __init__(self, name, caster: Union[Callable, _empty, None], default):
         self.name = name
         self.caster = caster if caster is not _empty else None
         self.default = default if default is not _empty else missing
@@ -254,9 +255,11 @@ class SkipValue(Exception):
 
 
 class value_factory:
-    """Generates value at runtime."""
+    """Generates value at runtime.
 
-    def __init__(self, factory):
+    Can be used as a default value."""
+
+    def __init__(self, factory: Callable):
         self.factory = factory
 
     def __call__(self):
@@ -278,6 +281,14 @@ def apply_settings(settings: Union[Settings, dict] = None, **options):
     return wrapper
 
 
-def cast(input_data, schema, processor=Processor, **settings):
-    """Casts data based of schema and settings."""
+def cast(input_data, schema, processor: Processor = Processor, **settings):
+    """Casts data based on schema and settings.
+
+    Args:
+        input_data - any dict or object with public attributes;
+        schema - any class or function with annotations;
+    Kwargs:
+        processor - Processor instance for process input data;
+        settings - various casting settings;
+    """
     return processor(input_data, schema, settings).create()
