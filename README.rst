@@ -2,8 +2,6 @@
 
 ----
 
-::
-
 |pypi| |coverage| |license|
 
 ----
@@ -36,9 +34,10 @@ Define schema (can be any class with annotations) and use ``cast`` function.
     # {'zero': False, 'one': 1, 'two': '2', 'three': 0.3, four': 5}
 
 Rules are simple:
-- Annotation is a *caster*, which will be called with the provided value, eg. ``bool(0)``.
-- If no default value is provided, the ``RequiredFieldError`` will be raised.
-- ``None`` in annotation means no casting.
+
+-  Annotation is a *caster*, which will be called with the provided value, eg. ``bool(0)``.
+-  If no default value is provided, the ``RequiredFieldError`` will be raised.
+-  ``None`` in annotation means no casting.
 
 
 Settings
