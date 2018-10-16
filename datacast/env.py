@@ -14,15 +14,11 @@ class LoadEnviron(type):
         return cast(os.environ, schema)
 
 
-class EnvironConfig(dict_obj):
-    """Result class for store env vars."""
-
-
-class EnvironSchema(metaclass=LoadEnviron):
+class EnvironConfig(metaclass=LoadEnviron):
     """Base schema class to create env configs."""
 
     __settings__ = {
         'precasters': [str_caster],
         'on_extra': 'ignore',
-        'result_class': EnvironConfig
+        'result_class': dict_obj
     }

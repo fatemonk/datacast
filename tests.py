@@ -5,8 +5,13 @@ import pytest
 
 from datacast import cast as _cast, apply_settings
 from datacast.caster import str_caster
-from datacast.env import EnvironSchema
+from datacast.env import EnvironConfig
 from datacast.errors import *
+
+
+os.environ['SPAM'] = '1'
+os.environ['HAM'] = 't'
+os.environ['RABBIT'] = 'null'
 
 
 class SimpleEnum(Enum):
@@ -32,16 +37,9 @@ def test_cast():
 
 
 @pytest.fixture
-def os_env():
-    os.environ['SPAM'] = '1'
-    os.environ['HAM'] = 't'
-    os.environ['RABBIT'] = 'null'
-
-
-@pytest.fixture
 def simple_env_conf():
     def wrapper():
-        class SimpleEnvConfig(EnvironSchema):
+        class SimpleEnvConfig(EnvironConfig):
             SPAM: int
             HAM: bool = False
             RABBIT: None = None
@@ -50,7 +48,7 @@ def simple_env_conf():
     return wrapper
 
 
-def test_env(os_env, simple_env_conf):
+def test_env(simple_env_conf):
     conf = simple_env_conf()
     assert conf.SPAM == 1
     assert conf.HAM is True
@@ -58,7 +56,7 @@ def test_env(os_env, simple_env_conf):
     assert conf.KNIGHT == 'TestString'
 
 
-def test_env_fail(os_env, simple_env_conf):
+def test_env_fail(simple_env_conf):
     del os.environ['SPAM']
     with pytest.raises(RequiredFieldError):
         simple_env_conf()
@@ -80,5 +78,4 @@ def test_cast_with_settings():
     assert cast(spam=1, ham=True) == dict(spam='1', ham='True', rabbit='2')
     with pytest.raises(RequiredFieldError):
         cast(ham=True, rabbit=SimpleEnum.ONE)
-    assert cast(spam='spam') == dict(spam='spam', ham='False', rabbit='2')
     assert cast(spam='spam', f=1) == dict(spam='spam', ham='False', rabbit='2')
