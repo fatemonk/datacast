@@ -2,7 +2,7 @@
 
 ----
 
-|pypi| |coverage| |license|
+|pypi| |python_version| |coverage| |license|
 
 ----
 
@@ -45,8 +45,12 @@ Settings
 
 To be added.
 
-.. |pypi| image:: https://img.shields.io/badge/version-0.1.0-orange.svg?style=flat-square
+.. |pypi| image:: https://img.shields.io/pypi/v/datacast.svg?style=flat-square&label=version
+    :target: https://pypi.org/project/datacast
     :alt: Latest version released on PyPI
+
+.. |python_version| image:: https://img.shields.io/badge/python-%3E%3D3.3-blue.svg?style=flat-square
+    :alt: Minimal Python version
 
 .. |coverage| image:: https://img.shields.io/badge/coverage-86%25-yellowgreen.svg?style=flat-square
     :alt: Test coverage
