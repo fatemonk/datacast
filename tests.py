@@ -3,9 +3,7 @@ from enum import Enum
 
 import pytest
 
-from datacast import cast as _cast, apply_settings
-from datacast.caster import str_caster
-from datacast.env import EnvironConfig
+from datacast import cast as _cast, apply_settings, EnvironConfig
 from datacast.errors import *
 
 
