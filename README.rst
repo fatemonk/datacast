@@ -1,10 +1,10 @@
 **Datacast** is a Python package that validates and converts your data.
 
-----
+--------------------------------------------
 
 |pypi| |python_version| |coverage| |license|
 
-----
+--------------------------------------------
 
 Basic Usage
 -----------
@@ -47,7 +47,7 @@ Rules are simple:
 
 
 Config
---------
+------
 You can use ``Config`` class which acts like a schema AND stores result data.
 
 .. code:: python
@@ -97,11 +97,12 @@ it will still (most likely) make a cast.
 :Valid ``None`` strings: ``'none', 'null', 'nil'``
 :Valid ``True`` strings: ``'true', 't', 'yes', 'y', 'on', '1'``
 :Valid ``False`` strings: ``'false', 'f', 'no', 'n', 'off', '0', ''``
+
 Case doesn't matter.
 
 
 Settings
----------
+--------
 
 You can specify various settings and apply them in a bunch of different ways.
 
