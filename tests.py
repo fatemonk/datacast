@@ -60,7 +60,12 @@ def test_env_fail(env_setup):
     with pytest.raises(RequiredFieldError):
         SimpleEnvConfig()
     os.environ['SPAM'] = '2'
-    assert SimpleEnvConfig().SPAM == 2
+    config = SimpleEnvConfig()
+    assert config.SPAM == 2
+    assert (
+        config._asdict() ==
+        dict(SPAM=2, HAM=True, RABBIT=None, KNIGHT='TestString')
+    )
 
 
 @apply_settings(

@@ -299,9 +299,14 @@ class Config:
     """
 
     def __init__(self, input_data, processor=None, **settings):
+        self.__keys__ = []
         result = cast(input_data, self.__class__, processor, **settings)
         for key, value in result.items():
+            self.__keys__.append(key)
             setattr(self, key, value)
+
+    def _asdict(self) -> dict:
+        return {key: getattr(self, key) for key in self.__keys__}
 
 
 class EnvironConfig(Config):
