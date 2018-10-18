@@ -1,4 +1,4 @@
-*Datacast* is a Python package that validates and converts your data.
+**Datacast** is a Python package that validates and converts your data.
 
 ----
 
