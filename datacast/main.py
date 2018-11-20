@@ -1,3 +1,32 @@
+"""Datacast is a Python package that validates and converts your data.
+
+Define schema (can be any class with annotations) and use cast function.
+
+Example:
+    from datacast import cast
+
+    class Schema:
+        one: int
+        two: str
+        three: (lambda x: x ** 2)
+        zero: (int, bool)
+        four: float = 0.4
+        five: None = 'five'
+
+    cast({'one': 1, 'two': 2, 'three': 3, 'zero': '0', 'five': 5}, Schema)
+    # {'one': 1, 'two': '2', 'three': 9, 'zero': False, 'four': 0.4, 'five': 5}
+
+Rules:
+    - Params without annotations will be ignored.
+    - Annotation is a caster, which will be called with the provided value,
+      eg. bool(0).
+    - Caster is any callable. Functions, lambdas, classes etc.
+    - It also can be list or tuple (or another iterable). Then it acts like
+      a chain of casters, eg. int('0') -> bool(0) -> False.
+    - If there is no default value - param is required and will raise
+      RequiredFieldError if not provided.
+    - None in annotation means no casting.
+"""
 import os
 from abc import ABC, abstractmethod
 from collections import UserDict
@@ -6,9 +35,10 @@ from enum import Enum
 from inspect import (_empty, isclass, isdatadescriptor,
                      ismethod, isroutine, signature)
 from itertools import chain
-from typing import Callable, Union, Type
+from typing import Any, Callable, Union, Type
 
-from .errors import *
+from .errors import (RequiredFieldError, ExtraValueError, CastError,
+                     InvalidCaster, InvalidSchema, InvalidOption)
 
 
 __all__ = [
@@ -16,14 +46,27 @@ __all__ = [
     'Processor', 'Schema', 'Settings', 'Config', 'EnvironConfig'
 ]
 
+VALID_NONE_STR = {'none', 'null', 'nil'}
+VALID_BOOL_STR = {
+    False: ('false', 'f', 'no', 'n', 'off', '0', ''),
+    True: ('true', 't', 'yes', 'y', 'on', '1')
+}
+
 
 class Option(str, Enum):
     """What to do when things go wrong."""
     IGNORE = 'ignore'  # value will be absent in result
     STORE = 'store'  # value will be stored in result
     RAISE = 'raise'  # corresponding exception will be raised
-    CAST = 'cast'  # value will be casted with (pre & post)casters and stored
+    CAST = 'cast'  # value will be casted with pre-/postcasters and stored
     # CAST works only for extra values!
+
+
+class missing:
+    """Marker object when value is missing."""
+
+    def __repr__(self):
+        return '<missing value>'
 
 
 class Processor:
@@ -40,7 +83,7 @@ class Processor:
             return obj
         return self.__cache__.setdefault(id(obj), Schema(obj))
 
-    def create(self):
+    def run(self):
         """Main method, magic happens here."""
         result = self.settings.result_class()
         for field in self.schema:
@@ -50,55 +93,55 @@ class Processor:
                 continue
             result[field.name] = value
         if self.data:
-            self._extra_values(result)
+            self._process_extra_values(result)
         return result
 
     def _process_value(self, field):
         """Get single value from input and process it."""
         value = self.data.pop(field.name, field.default)
         if value is missing:
-            return self._bad_value_action(
-                self.settings.on_missing,
-                lambda: RequiredFieldError(field.name),
-                lambda: self._missing_value()
-            )
+            return self._process_missing_value(field.name)
         try:
             caster = self._get_casters_chain(field.caster)
             return self._cast_value(value, caster)
         except InvalidCaster:
             raise
-        except Exception as e:
-            return self._bad_value_action(
-                self.settings.on_invalid,
-                lambda: CastError(value, e),
-                lambda: value
-            )
+        except Exception as exc:
+            return self._process_invalid_value(value, exc)
 
-    def _extra_values(self, result):
-        """What to do with extra values."""
-        on_extra = self.settings.on_extra
-        if on_extra == Option.STORE:
-            result.update(self.data)
-        elif on_extra == Option.CAST:
-            caster = tuple(self._get_casters_chain(None))
-            result.update({
-                k: self._cast_value(v, caster) for k, v in self.data.items()
-            })
-        elif on_extra == Option.RAISE:
-            raise ExtraValueError(self.data)
-        elif on_extra != Option.IGNORE:
-            raise InvalidOption(on_extra, 'extra')
-        return
-
-    def _bad_value_action(self, option, error, value):
-        """What to do with bad values."""
-        if option == Option.STORE:
-            return value()
+    def _process_missing_value(self, field_name):
+        option = self.settings.on_missing
+        if option in (Option.STORE, Option.CAST):
+            return self._missing_value()
         if option == Option.RAISE:
-            raise error()
+            raise RequiredFieldError(field_name)
         if option == Option.IGNORE:
             raise SkipValue
         raise InvalidOption(option)
+
+    def _process_invalid_value(self, value, exc):
+        option = self.settings.on_invalid
+        if option == Option.STORE:
+            return value
+        if option == Option.RAISE:
+            raise CastError(value, exc)
+        if option == Option.IGNORE:
+            raise SkipValue
+        raise InvalidOption(option)
+
+    def _process_extra_values(self, result):
+        """What to do with extra values."""
+        option = self.settings.on_extra
+        if option == Option.STORE:
+            result.update(self.data)
+        elif option == Option.CAST:
+            caster = tuple(self._get_casters_chain(None))
+            result.update({key: self._cast_value(value, caster)
+                           for key, value in self.data.items()})
+        elif option == Option.RAISE:
+            raise ExtraValueError(self.data)
+        elif option != Option.IGNORE:
+            raise InvalidOption(option, 'extra')
 
     def _get_casters_chain(self, caster):
         """Get full casters chain with pre and postcasters."""
@@ -108,8 +151,8 @@ class Processor:
             return caster
         try:
             return chain(precasters, [caster], postcasters)
-        except Exception as e:
-            raise InvalidCaster(e)
+        except Exception as exc:
+            raise InvalidCaster(exc)
 
     def _cast_value(self, value, caster):
         """Cast single value with casters chain."""
@@ -117,28 +160,25 @@ class Processor:
             return value
         if callable(caster):
             return caster(value)
-        if self._is_ordered_sequence(caster):
+        if is_ordered_sequence(caster):
             for _caster in caster:
                 value = self._cast_value(value, _caster)
             return value
         raise InvalidCaster(caster, type(caster))
 
-    def _is_ordered_sequence(self, caster):
-        """Caster can be ordered sequence of another casters."""
-        return (
-            isinstance(caster, Iterable) and
-            not isinstance(caster, (Mapping, Set))
-        )
-
     def _missing_value(self):
         """Get or create missing based on settings."""
         value = self.settings.missing_value
-        if (
-            isinstance(value, value_factory) or
-            callable(value) and not self.settings.store_callables
-        ):
+        if (isinstance(value, value_factory)
+                or callable(value) and not self.settings.store_callables):
             return value()
         return value
+
+
+def is_ordered_sequence(caster):
+    """Caster can be ordered sequence of another casters."""
+    return (isinstance(caster, Iterable)
+            and not isinstance(caster, (Mapping, Set)))
 
 
 class InputData(UserDict):
@@ -146,7 +186,7 @@ class InputData(UserDict):
 
     def __init__(self, input_data):
         input_data = input_data or {}
-        self.data = (
+        super().__init__(
             dict(input_data) if isinstance(input_data, Mapping) else
             {k: v for k, v in iter_attrs(input_data, include_properties=True)}
         )
@@ -154,13 +194,55 @@ class InputData(UserDict):
 
 def iter_attrs(obj, include_properties=False):
     """Iterates through the attributes of object."""
-    return (
-        (k, v) for k, v in obj.__dict__.items()
-        if not (
-            k.startswith('_') or ismethod(v) or
-            include_properties or isdatadescriptor(v)
-        )
-    )
+    for key, value in obj.__dict__.items():
+        if key.startswith('_') or ismethod(value):
+            continue
+        if not include_properties and isdatadescriptor(value):
+            continue
+        yield key, value
+
+
+class Caster(ABC):
+    """Function which transforms value into desireable one."""
+    def __new__(cls, value):
+        return object.__new__(cls)(value)
+
+    @abstractmethod
+    def __call__(self, value):
+        """Must be implemented."""
+
+
+def str_to_none(value: str):
+    """Returns None if string is none-like word."""
+    value = value.strip().lower()
+    if value in VALID_NONE_STR:
+        return None
+    raise TypeError(value)
+
+
+def str_to_bool(value: str):
+    """Returns True or False if string is bool-like word."""
+    value = value.strip().lower()
+    for result, valid in VALID_BOOL_STR.items():
+        if value in valid:
+            return result
+    raise TypeError(value)
+
+
+class str_caster(Caster):
+    """Casts string into most probable type based on its value."""
+    CASTERS = (float, str_to_none, str_to_bool)
+
+    def __call__(self, value):
+        for caster in self.CASTERS:
+            try:
+                return caster(value)
+            except Exception:
+                pass
+        return value
+
+
+CasterUnion = Union[Caster, Callable, _empty, None]
 
 
 class Schema:
@@ -169,28 +251,8 @@ class Schema:
     def __init__(self, obj):
         settings = getattr(obj, '__settings__', {})
         self.settings = SettingsBuilder(settings) if settings else None
-        self.fields = {args[0]: Field(*args) for args in self._iter_obj(obj)}
-
-    def _iter_obj(self, obj):
-        """Iter over annotations of object."""
-        if isclass(obj):
-            if not hasattr(obj, '__annotations__'):
-                return
-            yield from self._iter_class(obj)
-        elif isroutine(obj):
-            yield from self._iter_function(obj)
-        else:
-            raise InvalidSchema(obj)
-
-    def _iter_class(self, obj):
-        for name, caster in obj.__annotations__.items():
-            yield name, caster or _empty, getattr(obj, name, _empty)
-
-    def _iter_function(self, obj):
-        for name, param in signature(obj).parameters.items():
-            if param.annotation is _empty:
-                continue
-            yield name, param.annotation, param.default
+        self.fields = {args[0]: Field(*args)
+                       for args in iter_object_annotations(obj)}
 
     def __iter__(self):
         yield from self.fields.values()
@@ -203,10 +265,39 @@ class Schema:
 class Field:
     """Field with name, caster and default value if provided."""
 
-    def __init__(self, name, caster: Union[Callable, _empty, None], default):
+    def __init__(self, name: str, caster: CasterUnion, default: Any = missing):
         self.name = name
         self.caster = caster if caster is not _empty else None
         self.default = default if default is not _empty else missing
+
+
+def iter_object_annotations(obj) -> (str, CasterUnion, Any):
+    """Iter over annotations of object."""
+    if isclass(obj):
+        yield from iter_class_annotations(obj)
+    elif isroutine(obj):
+        yield from iter_function_annotations(obj)
+    else:
+        raise InvalidSchema(obj)
+
+
+def iter_class_annotations(obj):
+    """Iterates over annotations of class and it's default values."""
+    fields = set()
+    for cls in obj.__mro__:
+        for name, caster in getattr(cls, '__annotations__', {}).items():
+            if name in fields:
+                continue
+            fields.add(name)
+            yield name, caster or _empty, getattr(cls, name, _empty)
+
+
+def iter_function_annotations(obj):
+    """Iterates over annotations of function and it's default values."""
+    for name, param in signature(obj).parameters.items():
+        if param.annotation is _empty:
+            continue
+        yield name, param.annotation, param.default
 
 
 class Settings:
@@ -232,7 +323,7 @@ class Settings:
 class SettingsBuilder:
     """Creates settings from dict or another Settings object or class."""
 
-    def __new__(self, settings: Union[Type[Settings], Settings, dict]):
+    def __new__(cls, settings: Union[Type[Settings], Settings, dict]):
         if isclass(settings) and issubclass(settings, Settings):
             return settings()
         if isinstance(settings, Settings):
@@ -243,47 +334,6 @@ class SettingsBuilder:
         if isinstance(_settings, Settings):
             return _settings
         return Settings(**settings)
-
-
-class Caster(ABC):
-    """Function which transforms value into desireable one."""
-    def __new__(cls, value):
-        return object.__new__(cls)(value)
-
-    @abstractmethod
-    def __call__(self, value):
-        """Must be implemented."""
-
-
-class str_caster(Caster):
-    """Casts string into most probable type based on its value."""
-    VALID_BOOL_STR = {
-        False: ('false', 'f', 'no', 'n', 'off', '0', ''),
-        True: ('true', 't', 'yes', 'y', 'on', '1')
-    }
-    VALID_NONE_STR = {'none', 'null', 'nil'}
-
-    def to_bool(value: str):
-        value = value.strip().lower()
-        for result, valid in str_caster.VALID_BOOL_STR.items():
-            if value in valid:
-                return result
-        raise TypeError(value)
-
-    def to_none(value: str):
-        if value.lower() in str_caster.VALID_NONE_STR:
-            return None
-        raise TypeError(value)
-
-    CASTERS = (int, float, to_none, to_bool)
-
-    def __call__(self, value):
-        for caster in self.CASTERS:
-            try:
-                return caster(value)
-            except Exception as e:
-                pass
-        return value
 
 
 class Config:
@@ -314,13 +364,6 @@ class EnvironConfig(Config):
 
     def __init__(self):
         super().__init__(os.environ, on_extra='ignore', precasters=[str_caster])
-
-
-class missing:
-    """Marker object when value is missing."""
-
-    def __repr__(self):
-        return '<missing value>'
 
 
 class SkipValue(Exception):
@@ -358,4 +401,4 @@ def cast(input_data, schema, processor=None, **settings):
         settings - various casting settings;
     """
     processor = processor or Processor
-    return processor(input_data, schema, settings).create()
+    return processor(input_data, schema, settings).run()
