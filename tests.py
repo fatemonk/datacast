@@ -45,6 +45,7 @@ class SimpleEnvConfig(EnvironConfig):
     HAM: bool = False
     RABBIT: None = None
     KNIGHT: str = 'TestString'
+    GRAIL: str = ''
 
 
 def test_env(env_setup):
@@ -53,6 +54,7 @@ def test_env(env_setup):
     assert conf.HAM is True
     assert conf.RABBIT is None
     assert conf.KNIGHT == 'TestString'
+    assert conf.GRAIL == ''
 
 
 def test_env_fail(env_setup):
@@ -64,7 +66,7 @@ def test_env_fail(env_setup):
     assert config.SPAM == 2
     assert (
         config._asdict() ==
-        dict(SPAM=2, HAM=True, RABBIT=None, KNIGHT='TestString')
+        dict(SPAM=2, HAM=True, RABBIT=None, KNIGHT='TestString', GRAIL='')
     )
 
 

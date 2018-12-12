@@ -76,23 +76,17 @@ casts strings to appropriate types and ignores extra vars.
         SPAM: bool
         HAM: int
         RABBIT: str
-        AUTOCAST: None
         NONE_VAL: None
 
     os.environ['SPAM'] = '0'
     os.environ['HAM'] = '1'
     os.environ['RABBIT'] = '2'
-    os.environ['AUTOCAST'] = '3.5'
     os.environ['NONE_VAL'] = 'null'
     config = SimpleEnvironConfig()
     assert config.SPAM == False
     assert config.HAM == 1
     assert config.RABBIT == '2'
-    assert config.AUTOCAST == 3.5
     assert config.NONE_VAL == None
-
-Note that you can actually not specify a *caster* and use ``None`` instead,
-it will still (most likely) make a cast.
 
 :Valid ``None`` strings: ``'none', 'null', 'nil'``
 :Valid ``True`` strings: ``'true', 't', 'yes', 'y', 'on', '1'``

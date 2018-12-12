@@ -46,7 +46,7 @@ __all__ = [
     'Processor', 'Schema', 'Settings', 'Config', 'EnvironConfig'
 ]
 
-VALID_NONE_STR = {'none', 'null', 'nil'}
+VALID_NONE_STR = {'none', 'null', 'nil', ''}
 VALID_BOOL_STR = {
     False: ('false', 'f', 'no', 'n', 'off', '0', ''),
     True: ('true', 't', 'yes', 'y', 'on', '1')
@@ -156,7 +156,7 @@ class Processor:
 
     def _cast_value(self, value, caster):
         """Cast single value with casters chain."""
-        if caster is None or isclass(caster) and isinstance(value, caster):
+        if caster is None or isclass(caster) and type(value) == caster:
             return value
         if callable(caster):
             return caster(value)
@@ -363,7 +363,24 @@ class EnvironConfig(Config):
     """Loads input_data from env and casts values into most probable type."""
 
     def __init__(self):
-        super().__init__(os.environ, on_extra='ignore', precasters=[str_caster])
+        super().__init__(
+            os.environ,
+            processor=EnvironProcessor,
+            on_extra='ignore'
+        )
+
+
+class EnvironProcessor(Processor):
+    """Process logic strings from env."""
+    logic_casters = {
+        None: str_to_none,
+        bool: str_to_bool
+    }
+
+    def _cast_value(self, value, caster):
+        if isinstance(value, str) and caster in self.logic_casters:
+            caster = self.logic_casters[caster]
+        return super()._cast_value(value, caster)
 
 
 class SkipValue(Exception):
