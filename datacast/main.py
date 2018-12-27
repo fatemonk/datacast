@@ -107,7 +107,7 @@ class Processor:
         except InvalidCaster:
             raise
         except Exception as exc:
-            return self._process_invalid_value(value, exc)
+            return self._process_invalid_value(value, caster, exc)
 
     def _process_missing_value(self, field_name):
         option = self.settings.on_missing
@@ -119,12 +119,12 @@ class Processor:
             raise SkipValue
         raise InvalidOption(option)
 
-    def _process_invalid_value(self, value, exc):
+    def _process_invalid_value(self, value, caster, exc):
         option = self.settings.on_invalid
         if option == Option.STORE:
             return value
         if option == Option.RAISE:
-            raise CastError(value, exc)
+            raise CastError(value, caster, exc)
         if option == Option.IGNORE:
             raise SkipValue
         raise InvalidOption(option)
@@ -372,14 +372,10 @@ class EnvironConfig(Config):
 
 class EnvironProcessor(Processor):
     """Process logic strings from env."""
-    logic_casters = {
-        None: str_to_none,
-        bool: str_to_bool
-    }
 
     def _cast_value(self, value, caster):
-        if isinstance(value, str) and caster in self.logic_casters:
-            caster = self.logic_casters[caster]
+        if isinstance(value, str) and caster is bool:
+            caster = str_to_bool
         return super()._cast_value(value, caster)
 
 
