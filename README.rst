@@ -150,6 +150,8 @@ store_callables  ``False``     If ``False`` - execute callable value on store.
 result_class     ``dict``      Class which stores result data.
 precasters       ``()``        Prepend additional casters.
 postcasters      ``()``        Append additional casters.
+cast_defaults    ``False``     Cast default values with full casters chain.
+raise_original   ``False``     Raise original exception instead of CastError.
 ===============  ============  ===============================================
 
 **Options for 'on_extra', 'on_invalid' and 'on_missing'**

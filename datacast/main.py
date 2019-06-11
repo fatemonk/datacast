@@ -98,7 +98,11 @@ class Processor:
 
     def _process_value(self, field):
         """Get single value from input and process it."""
-        value = self.data.pop(field.name, field.default)
+        value = self.data.pop(field.name, missing)
+        if value is missing:
+            value = field.default
+            if not (value is missing or self.settings.cast_defaults):
+                return value
         if value is missing:
             return self._process_missing_value(field.name)
         try:
@@ -124,7 +128,9 @@ class Processor:
         if option == Option.STORE:
             return value
         if option == Option.RAISE:
-            raise CastError(value, caster, exc)
+            if self.settings.raise_original:
+                raise exc
+            raise CastError(value, caster)
         if option == Option.IGNORE:
             raise SkipValue
         raise InvalidOption(option)
@@ -310,6 +316,8 @@ class Settings:
     result_class = dict  # class which stores result data
     precasters = ()  # prepend additional casters
     postcasters = ()  # append additional casters
+    cast_defaults = False  # run casters on default values
+    raise_original = False  # raise original exception instead of CastError
 
     def __init__(self, **settings):
         for name, _ in iter_attrs(self.__class__):

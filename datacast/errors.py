@@ -14,8 +14,8 @@ class ExtraValueError(DatacastException):
 class CastError(DatacastException):
     """Value cannot be casted."""
 
-    def __init__(self, value, caster, exc):
-        super().__init__({'value': value, 'caster': caster}, exc)
+    def __init__(self, value, caster):
+        super().__init__({'value': value, 'caster': caster})
 
 class InvalidCaster(DatacastException):
     """Not a valid caster."""

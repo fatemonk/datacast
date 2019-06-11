@@ -52,7 +52,7 @@ def test_env(env_setup):
     conf = SimpleEnvConfig()
     assert conf.SPAM == 1
     assert conf.HAM is True
-    assert conf.RABBIT is None
+    assert conf.RABBIT == 'null'
     assert conf.KNIGHT == 'TestString'
     assert conf.GRAIL == ''
 
@@ -66,14 +66,15 @@ def test_env_fail(env_setup):
     assert config.SPAM == 2
     assert (
         config._asdict() ==
-        dict(SPAM=2, HAM=True, RABBIT=None, KNIGHT='TestString', GRAIL='')
+        dict(SPAM=2, HAM=True, RABBIT='null', KNIGHT='TestString', GRAIL='')
     )
 
 
 @apply_settings(
     on_extra='ignore',
     on_invalid='store',
-    postcasters=[str]
+    postcasters=[str],
+    cast_defaults=True
 )
 class SchemaWithSettings:
     spam: int
@@ -87,3 +88,12 @@ def test_cast_with_settings():
     with pytest.raises(RequiredFieldError):
         cast(ham=True, rabbit=SimpleEnum.ONE)
     assert cast(spam='spam', f=1) == dict(spam='spam', ham='False', rabbit='2')
+
+
+class SchemaOrig:
+    spam: int
+
+
+def test_raise_original():
+    with pytest.raises(ValueError):
+        _cast({'spam': 'spam'}, SchemaOrig, raise_original=True)
